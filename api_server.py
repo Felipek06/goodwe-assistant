@@ -1,4 +1,3 @@
-# api_server.py
 import json
 from pathlib import Path
 from datetime import datetime
@@ -13,7 +12,7 @@ MOCK_PATH = ROOT / "data" / "mock_today.json"
 
 app = FastAPI(title="GoodWe Assistant API", version="1.0")
 
-# (Opcional) habilita CORS para testes em browser; não atrapalha a Alexa.
+# Habilita CORS (opcional)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -84,16 +83,9 @@ def get_status():
     res = resumo_dia(df)
     return res
 
-app = FastAPI()
-
 @app.get("/")
 def read_root():
     return {"message": "API Goodwe rodando com sucesso 🚀"}
-
-@app.get("/status")
-def get_status():
-    return {"status": "online", "inversor": "Goodwe"}
-app = FastAPI()
 
 @app.get("/potencia")
 def get_potencia():
