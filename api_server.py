@@ -8,12 +8,13 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# ================== Configurações ==================
 ROOT = Path(__file__).parent
 MOCK_PATH = ROOT / "data" / "mock_today.json"
 
 app = FastAPI(title="GoodWe Assistant API", version="1.0")
 
-# (Opcional) habilita CORS para testes em browser; não atrapalha a Alexa.
+# Habilita CORS (útil para testes em browser, não atrapalha Alexa)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,7 +23,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ================== Funções Auxiliares ==================
 def carregar_mock(path: Path) -> pd.DataFrame:
+    """Carrega dados mockados em formato DataFrame."""
     if not path.exists():
         return pd.DataFrame()
     with open(path, "r", encoding="utf-8") as f:
@@ -32,38 +35,41 @@ def carregar_mock(path: Path) -> pd.DataFrame:
         df["time"] = pd.to_datetime(df["time"])
     return df
 
+
 def resumo_dia(df: pd.DataFrame) -> dict:
+    """Gera um resumo diário com métricas principais do inversor."""
     if df.empty:
         return {}
-    # Geração do dia (Eday é cumulativo)
-    energia_dia = float(df["Eday"].dropna().iloc[-1]) if "Eday" in df.columns and not df["Eday"].dropna().empty else 0.0
 
-    # Pico de potência e horário
-    if "Pac" in df.columns and not df["Pac"].dropna().empty:
+    # Energia do dia
+    energia_dia = float(df["Eday"].dropna().iloc[-1]) if "Eday" in df else 0.0
+
+    # Pico de potência
+    if "Pac" in df and not df["Pac"].dropna().empty:
         idx_max = df["Pac"].idxmax()
         pico_p = float(df.loc[idx_max, "Pac"])
-        hora_p = df.loc[idx_max, "time"] if "time" in df.columns else None
+        hora_p = df.loc[idx_max, "time"] if "time" in df else None
     else:
         pico_p, hora_p = 0.0, None
 
-    # SOC (primeiro e último)
-    soc_ini = int(df["Cbattery1"].dropna().iloc[0]) if "Cbattery1" in df.columns and not df["Cbattery1"].dropna().empty else None
-    soc_fim = int(df["Cbattery1"].dropna().iloc[-1]) if "Cbattery1" in df.columns and not df["Cbattery1"].dropna().empty else None
+    # SOC inicial/final
+    soc_ini = int(df["Cbattery1"].dropna().iloc[0]) if "Cbattery1" in df else None
+    soc_fim = int(df["Cbattery1"].dropna().iloc[-1]) if "Cbattery1" in df else None
 
-    # Consumo do dia (tenta várias colunas comuns)
+    # Consumo do dia (checa várias colunas possíveis)
     consumo_cols = [
         "EloadDay", "LoadEday", "EhouseDay", "EHomeDay",
         "LoadEnergyDay", "LoadEnergy", "Eload"
     ]
     consumo_dia: Optional[float] = None
     for c in consumo_cols:
-        if c in df.columns and not df[c].dropna().empty:
+        if c in df and not df[c].dropna().empty:
             consumo_dia = float(df[c].dropna().iloc[-1])
             break
 
-    # Status simples: ligado se potência atual > 5W
-    status = "ligado"
-    if "Pac" in df.columns and not df["Pac"].dropna().empty:
+    # Status: ligado se potência atual > 5W
+    status = "desligado"
+    if "Pac" in df and not df["Pac"].dropna().empty:
         pac_now = float(df["Pac"].dropna().iloc[-1])
         status = "ligado" if pac_now > 5 else "desligado"
 
@@ -78,31 +84,32 @@ def resumo_dia(df: pd.DataFrame) -> dict:
         "atualizado_em": datetime.utcnow().isoformat() + "Z",
     }
 
-@app.get("/status")
-def get_status():
-    df = carregar_mock(MOCK_PATH)  # (no futuro troque por dados reais)
-    res = resumo_dia(df)
-    return res
-
-app = FastAPI()
-
+# ================== Rotas ==================
 @app.get("/")
 def read_root():
     return {"message": "API Goodwe rodando com sucesso 🚀"}
 
+
 @app.get("/status")
 def get_status():
-    return {"status": "online", "inversor": "Goodwe"}
-app = FastAPI()
+    """Retorna resumo diário baseado nos dados mockados (ou futuros dados reais)."""
+    df = carregar_mock(MOCK_PATH)
+    return resumo_dia(df)
+
 
 @app.get("/potencia")
 def get_potencia():
+    """Exemplo de endpoint simples (mockado)."""
     return {"potencia": "3500W"}
+
 
 @app.get("/tensao")
 def get_tensao():
+    """Exemplo de endpoint simples (mockado)."""
     return {"tensao": "220V"}
+
 
 @app.get("/energia-hoje")
 def get_energia_hoje():
+    """Exemplo de endpoint simples (mockado)."""
     return {"energia_hoje": "12.4 kWh"}
